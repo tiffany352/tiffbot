@@ -1,6 +1,6 @@
 module tiffbot;
 
-import std.irc, std.string, std.process, std.file, std.thread;
+import std.irc, std.string, std.process, std.file, std.thread, std.time;
 
 enum PrivilegeLevel {
   Banned,
@@ -59,6 +59,7 @@ string handleInput (Server server, string channel, User user, string command, st
   return null;
 }
 
+Server[] servers;
 shared ThreadPool tp;
 void newServer(string nick, string address) using new Server (nick,address) {
   //writeln "$(void*:that)";
@@ -82,6 +83,7 @@ void newServer(string nick, string address) using new Server (nick,address) {
     }
   });
   tp.addTask &that.listen;
+  servers ~= that;
 }
 
 // tiffbot <nick> <server>
@@ -115,6 +117,10 @@ void main(string[] args) {
 
   tp = new ThreadPool 16;
   newServer(args[0],args[1]);
-  tp.waitComplete;
+  while true {
+    for auto s <- servers
+      s.sendCommand "PING :AAAAAAAA";
+    sleep(16);
+  }
 }
 
