@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# nick user host channel network ...
+
+echo ${*:6}
+

@@ -1,0 +1,120 @@
+module tiffbot;
+
+import std.irc, std.string, std.process, std.file, std.thread;
+
+enum PrivilegeLevel {
+  Banned,
+  None,
+  Admin,
+  Owner
+}
+
+(string, string delegate(Server,string,User,string[]))[] callbacks;
+
+(string,string[]) parseInput(string i) {
+  i = i.strip();
+  string command;
+  string[] args;
+  if i.startsWith "+" {
+    (command, string a) = (i.startsWith "+" #.slice " ");
+    args = a.split " ";
+  } else {
+    FindResult f = i.toLower().find "tiffbot";
+    if f {
+      string[] s = i[f.pos..$].split " ";
+      if s.length > 1 {
+        command = s[1];
+        args = s[2..$];
+      }
+    }
+  }
+  
+  //auto ret = (command.toLower(),args);
+  return (command.toLower(),args);
+}
+
+string handleInput (Server server, string channel, User user, string command, string[] args) {
+  for auto c <- callbacks {
+    if c[0] == command {
+      writeln "Calling internal callback $command";
+      return c[1](server,channel,user,args);
+    }
+  }
+  if command.startsWith ".."
+    return ":D nice try";
+  if command.startsWith "/"
+    return "hehe you so silly :3";
+  if exists "commands/$command" {
+    writeln "Calling external callback $command";
+    string[auto~] a;
+    a ~= user.nick;
+    a ~= user.user;
+    a ~= user.host;
+    a ~= channel;
+    a ~= server.name;
+    a ~= args;
+    return std.string.join readback("commands/$command",a[]);
+  }
+  writeln "Command $command not found.";
+  return null;
+}
+
+shared ThreadPool tp;
+void newServer(string nick, string address) using new Server (nick,address) {
+  //writeln "$(void*:that)";
+  setCommand(Command.PRIVMSG, new \(User u, string[] args) {
+    //writeln "$(void*:that)";
+    string message = args[1];
+    string target = args[0];
+    writeln "$target: <$(u.nick)> $message";
+    auto t = parseInput message;
+    //if !t return;
+    if !t[0] return;
+    string r = handleInput(that,target,u,t[0],t[1]);
+    if r {
+      if target == me.nick {
+        msg(u.nick,r);
+        writeln "$(u.nick): <$(me.nick)> $r";
+      } else {
+        msg(target,u.nick ~ ": " ~ r);
+        writeln "$target: <$(me.nick)> $(u.nick): $r)";
+      }
+    }
+  });
+  tp.addTask &that.listen;
+}
+
+// tiffbot <nick> <server>
+void main(string[] args) {
+  
+  callbacks ~= ("join",
+    \(Server server,string channel,User user,string[] args) {
+      //writeln "$(void*:server)";
+      if !server raise new Error "wth server is null";
+      for auto c <- args {
+        server.join c;
+        writeln "Joining $c";
+      }
+      return string:null;
+    }
+  );
+  
+  callbacks ~= ("connect",
+    \(Server server,string channel,User user,string[] args) {
+      newServer(server.me.nick, args[0]);
+      return string:null;
+    }
+  );
+  
+  callbacks ~= ("nick",
+    \(Server server,string channel,User user,string[] args) {
+      server.nick args[0];
+      return string:null;
+    }
+  );
+
+  tp = new ThreadPool 16;
+  newServer(args[0],args[1]);
+  tp.waitComplete;
+}
+

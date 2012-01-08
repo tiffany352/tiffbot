@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "internal: join, connect; external:" $(ls -A -m commands)
+
