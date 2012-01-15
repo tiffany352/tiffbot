@@ -1,0 +1,7 @@
+#!/bin/bash
+
+rand = $(tempfile)
+cat commands/template-src/vars.csv | grep -v -e "^$7,.*" > $rand
+mv $rand commands/template-src/vars.csv
+echo "Deleted $7"
+

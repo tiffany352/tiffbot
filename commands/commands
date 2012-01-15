@@ -1,4 +1,4 @@
 #!/bin/sh
 
-echo "internal: join, connect; external:" $(ls -A -m commands)
+echo "internal: ban, user, admin, owner, join, connect, shutdown, nick; external:" $(ls -A -m commands)
 

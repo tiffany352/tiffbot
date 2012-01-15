@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sed -e "^\.*," commands/template-src/vars.csv | xargs echo
+

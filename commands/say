@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# nick user host channel network ...
+# nick user host priv channel network ...
 
-echo ${*:6}
+echo ${*:7}
 

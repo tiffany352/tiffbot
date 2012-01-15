@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo $7, ${*:8} >> commands/template-src/vars.csv
+echo "Added variable $7."
+

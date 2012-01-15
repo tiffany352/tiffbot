@@ -1,0 +1,15 @@
+module template;
+
+import templateparse, std.string, std.file;
+
+void main(string[] args) {
+  // args = [nick, user, host, priv, channel, server, ...]
+  string command = std.string.join(args[6..$], " ");
+  string[] lines = string:readAll "commands/template-src/vars.csv" #.split "\n";
+  for auto l <- lines {
+    string (key,val) = l.split "," #.(that[0].strip(),that[1].strip());
+    key.setVariable val;
+  }
+  writeln parseTemplate(command, \(string s)->"lol you so silly");
+}
+

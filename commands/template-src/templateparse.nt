@@ -1,0 +1,84 @@
+module templateparse;
+
+import std.string;
+
+(string,string)[auto~] variables;
+
+void setVariable(string key, string value) {
+  for auto v <- variables {
+    if v[0] == key {
+      v[1] = value;
+      return;
+    }
+  }
+  variables ~= (key,value);
+}
+
+string getVariable(string key) {
+  for auto v <- variables
+    if v[0] == key
+      return v[1];
+  //writeln "No variable $key";
+  return null;
+}
+
+void delVariable(string key) {
+  for (int i=0; i<variables.length; i++)
+    if variables[i][0] == key
+      variables = variables[0 .. i] ~ variables[i+1 .. $];
+}
+
+string parseTemplate(string t-in, string delegate(string) importfunc = null) {
+  string t-out = "";
+  string parse(string s) {
+    string[] words = s.strip().split " ";
+    string ret = "";
+    bool cond;
+    for (int i=0;i<words.length;i++) {
+      alias w = words[i].toLower();
+      alias working = (i < words.length);
+      if w == "import" {
+        ret ~= importfunc?(words[i+1]);
+        i++;
+      } else if w == "if" {
+        //bool cond = false;
+        cond = false;
+        for auto v <- variables
+          if v[0] == words[i+1]
+            cond = true;
+        if cond
+          i++;
+        else
+          while working && (w!="end" || w!="else") i++;
+      } else if w == "end" {
+      } else if w == "else" {
+        if cond
+          while working && w!="end" i++;
+      } else {
+        auto var = getVariable w;
+        if var ret~=var;
+        else ret~=words[i];
+      }
+    }
+    //writeln "ret: $ret";
+    return ret;
+  }
+  int start = 0;
+  string buf;
+  for (int p = 0; p < t-in.length; p++) {
+    alias c = t-in[p];
+    if c == "\\" {
+      t-out ~= t-in[++p];
+      p++;
+    }
+    if c == "{" {
+      start = p;
+      while (c != "}" && t-in[p-1]!="\\") p++;
+      buf = t-in[start+1 .. p];
+      t-out ~= parse buf;
+    } else
+      t-out ~= t-in[p];
+  }
+  return t-out;
+}
+

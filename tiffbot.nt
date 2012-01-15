@@ -1,6 +1,8 @@
 module tiffbot;
 
-import std.irc, std.string, std.process, std.file, std.thread, std.time;
+import std.irc, std.string, std.process, std.file, std.thread, std.time, std.fun; //, std.random;
+
+// external callbacks: nick user host privilege channel server args
 
 enum PrivilegeLevel {
   Banned,
@@ -9,7 +11,46 @@ enum PrivilegeLevel {
   Owner
 }
 
-(string, string delegate(Server,string,User,string[]))[] callbacks;
+shared (string, string delegate(Server,string,User,string[]))[] callbacks;
+
+// name, privileges, array of server nickserv statuses
+shared (User,PrivilegeLevel,(string,int)[])[] users;
+
+PrivilegeLevel getPrivilege(User u) {
+  for auto r <- users {
+    if usersEqual(r[0],u)
+      return r[1];
+    auto rest = r[0].nick.startsWith "R:";
+    if rest == u.nick {
+      // not implemented
+    }
+  }
+  return PrivilegeLevel.None;
+}
+
+bool hasPrivilege(User u, PrivilegeLevel p) {
+  return u.getPrivilege() >= p;
+}
+
+void setPrivilege(User u, PrivilegeLevel p) {
+  for auto r <- users {
+    if usersEqual(r[0],u)
+      r[1] = p;
+    auto rest = r[0].nick.startsWith "R:";
+    if rest == u.nick
+      r[1] = p;
+  }
+  users ~= (u,p,(string,int)[]: null);
+  writeln "User $(u.nick)!$(u.user)@$(u.host) now has permission level $p.";
+}
+
+void dumpUsers() {
+  char[auto~] userfile;
+  for auto u <- users {
+    userfile ~= "$(u[0].nick), $(u[0].user), $(u[0].host), $(u[1])\n";
+  }
+  "users.txt".writeAll byte[]:userfile[];
+}
 
 (string,string[]) parseInput(string i) {
   i = i.strip();
@@ -23,7 +64,7 @@ enum PrivilegeLevel {
     if f {
       string[] s = i[f.pos..$].split " ";
       if s.length > 1 {
-        command = s[1];
+        command = s[1].toLower();
         args = s[2..$];
       }
     }
@@ -34,13 +75,14 @@ enum PrivilegeLevel {
 }
 
 string handleInput (Server server, string channel, User user, string command, string[] args) {
+  if !(user.hasPrivilege PrivilegeLevel.None) return null;
   for auto c <- callbacks {
     if c[0] == command {
       writeln "Calling internal callback $command";
       return c[1](server,channel,user,args);
     }
   }
-  if command.startsWith ".."
+  if command.find ".."
     return ":D nice try";
   if command.startsWith "/"
     return "hehe you so silly :3";
@@ -50,6 +92,10 @@ string handleInput (Server server, string channel, User user, string command, st
     a ~= user.nick;
     a ~= user.user;
     a ~= user.host;
+    a ~= "$(getPrivilege user)";
+    //writeln "$(s.ptr) length: $(s.length)";
+    //writeln "priv: $s";
+    //a ~= s;
     a ~= channel;
     a ~= server.name;
     a ~= args;
@@ -59,12 +105,17 @@ string handleInput (Server server, string channel, User user, string command, st
   return null;
 }
 
-Server[] servers;
+string handleCTCP(Server server, string channel, User user, string command, string[] args) {
+
+}
+
+shared Server[] servers;
 shared ThreadPool tp;
-void newServer(string nick, string address) using new Server (nick,address) {
-  //writeln "$(void*:that)";
+//void init(string nick, string host, int port = 6667, string user = "NeatIRCLib", string identd = "neatirclib", string realname = "Neat IRC Library", string pass = null)
+void newServer(string nick, string address, string port, string passwd, string[] chans) using new Server (nick,address,6667,"tiffbot","tiffbot","Neat IRC Library",passwd) { // bad, eventually fix the port hack :|
+  writeln "$(void*:that) : $address";
   setCommand(Command.PRIVMSG, new \(User u, string[] args) {
-    //writeln "$(void*:that)";
+    writeln "$(void*:that)";
     string message = args[1];
     string target = args[0];
     writeln "$target: <$(u.nick)> $message";
@@ -82,16 +133,105 @@ void newServer(string nick, string address) using new Server (nick,address) {
       }
     }
   });
+  setCallback(Reply.RPL_WELCOME, new \(User u, string[] args) {
+    for auto c <- chans
+      c.join;
+  });
+  
   tp.addTask &that.listen;
   servers ~= that;
 }
 
-// tiffbot <nick> <server>
+extern(C) void exit(int);
 void main(string[] args) {
+  
+  /*User tiff;
+  tiff.nick = "tiffany";
+  tiff.user = "*";
+  tiff.host = "*";
+  tiff.setPrivilege PrivilegeLevel.Owner;*/
+  
+  callbacks ~= ("ban",
+    \(Server server,string channel,User user,string[] args) {
+      if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+      if args.length < 1 return string:null;
+      User victim;
+      if args[0].find "R:" {
+        victim.nick = args[0];
+        victim.user = "*";
+        victim.host = "*";
+      }
+      if args[0].find "!" {
+        (victim.nick, string rest) = args[0].slice "!";
+        (victim.user, victim.host) = args[0].slice "@";
+      }
+      victim.setPrivilege PrivilegeLevel.Banned;
+      return "$(args[0]) now has privilege level Banned.";
+    }
+  );
+  
+  callbacks ~= ("user",
+    \(Server server,string channel,User user,string[] args) {
+      if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+      if args.length < 1 return string:null;
+      User victim;
+      if args[0].find "R:" {
+        victim.nick = args[0];
+        victim.user = "*";
+        victim.host = "*";
+      }
+      if args[0].find "!" {
+        (victim.nick, string rest) = args[0].slice "!";
+        (victim.user, victim.host) = args[0].slice "@";
+      }
+      victim.setPrivilege PrivilegeLevel.None;
+      return "$(args[0]) now has privilege level None.";
+    }
+  );
+  
+  callbacks ~= ("admin",
+    \(Server server,string channel,User user,string[] args) {
+      if !user.hasPrivilege PrivilegeLevel.Owner return "Not Owner.";
+      if args.length < 1 return string:null;
+      User victim;
+      if args[0].find "R:" {
+        victim.nick = args[0];
+        victim.user = "*";
+        victim.host = "*";
+      }
+      if args[0].find "!" {
+        (victim.nick, string rest) = args[0].slice "!";
+        (victim.user, victim.host) = args[0].slice "@";
+      }
+      victim.setPrivilege PrivilegeLevel.Admin;
+      return "$(args[0]) now has privilege level Admin.";
+    }
+  );
+  
+  callbacks ~= ("owner",
+    \(Server server,string channel,User user,string[] args) {
+      if !user.hasPrivilege PrivilegeLevel.Owner return "Not Owner.";
+      if args.length < 1 return string:null;
+      User victim;
+      if args[0].find "R:" {
+        victim.nick = args[0];
+        victim.user = "*";
+        victim.host = "*";
+      }
+      if args[0].find "!" {
+        (victim.nick, string rest) = args[0].slice "!";
+        (victim.user, victim.host) = args[0].slice "@";
+      }
+      victim.setPrivilege PrivilegeLevel.Owner;
+      return "$(args[0]) now has privilege level Owner.";
+    }
+  );
   
   callbacks ~= ("join",
     \(Server server,string channel,User user,string[] args) {
       //writeln "$(void*:server)";
+      if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+      if args.length < 1 return string:null;
       if !server raise new Error "wth server is null";
       for auto c <- args {
         server.join c;
@@ -103,23 +243,59 @@ void main(string[] args) {
   
   callbacks ~= ("connect",
     \(Server server,string channel,User user,string[] args) {
-      newServer(server.me.nick, args[0]);
+      if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+      if args.length < 1 return string:null;
+      newServer(server.me.nick, args[0], "6667", string:null, string[]:null);
+      return string:null;
+    }
+  );
+  
+  callbacks ~= ("shutdown",
+    \(Server server,string channel,User user,string[] args) {
+      if !user.hasPrivilege PrivilegeLevel.Owner return "Not Admin.";
+      if args.length < 1 return string:null;
+      dumpUsers();
+      for auto s <- servers
+        s.quit "tiffbot";
+      exit(0);
       return string:null;
     }
   );
   
   callbacks ~= ("nick",
     \(Server server,string channel,User user,string[] args) {
+      if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+      if args.length < 1 return string:null;
       server.nick args[0];
       return string:null;
     }
   );
 
   tp = new ThreadPool 16;
-  newServer(args[0],args[1]);
+  //newServer(args[0],args[1],args[2..$]);
+  string[] lines = string:readAll "autojoin.txt" #.split "\n";
+  for auto l <- lines {
+    auto a = l.split "," #.map &strip #.eval;
+    writeln "$a";
+    // func: nick, address, port, passwd, chans
+    // file: server, port, nick, passwd, chans
+    newServer(a[(2, 0, 1, 3, 4..$)]);
+  }
+  
+  lines = string:readAll "users.txt" #.split "\n";
+  for auto l <- lines {
+    auto a = l.split "," #.map &strip #.eval;
+    User u;// = new User; // bad
+    u.nick = a[0];
+    u.user = a[1];
+    u.host = a[2];
+    u.setPrivilege PrivilegeLevel:atoi a[3];
+  }
+  //auto rng = getPRNG 23;
   while true {
     for auto s <- servers
-      s.sendCommand "PING :AAAAAAAA";
+      s.sendCommand "PING :00000000";
+      //s.sendCommand "PING :$(toString(rng.rand(),16))";
     sleep(16);
   }
 }
