@@ -1,0 +1,16 @@
+#!/usr/bin/env lua
+
+do
+  local nick, user, host, permissions, channel, network = unpack(arg);
+  for i=1,6 do
+    table.remove (arg, 1);
+  end
+  if tonumber(permissions) < 2 then
+    print "Admin or higher required.";
+    os.exit(1);
+  end
+  script = table.concat(arg," ");
+  
+  loadstring(script)();
+end
+

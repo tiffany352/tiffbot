@@ -49,7 +49,7 @@ void dumpUsers() {
   for auto u <- users {
     userfile ~= "$(u[0].nick), $(u[0].user), $(u[0].host), $(u[1])\n";
   }
-  "users.txt".writeAll byte[]:userfile[];
+  "users.csv".writeAll byte[]:userfile[];
 }
 
 (string,string[]) parseInput(string i) {
@@ -112,7 +112,7 @@ string handleCTCP(Server server, string channel, User user, string command, stri
 shared Server[] servers;
 shared ThreadPool tp;
 //void init(string nick, string host, int port = 6667, string user = "NeatIRCLib", string identd = "neatirclib", string realname = "Neat IRC Library", string pass = null)
-void newServer(string nick, string address, string port, string passwd, string[] chans) using new Server (nick,address,6667,"tiffbot","tiffbot","Neat IRC Library",passwd) { // bad, eventually fix the port hack :|
+void newServer(string nick, string address, string port, string passwd, string[] chans) using new Server (nick,address,atoi port,"tiffbot","tiffbot","Neat IRC Library",pass=>passwd) {
   writeln "$(void*:that) : $address";
   setCommand(Command.PRIVMSG, new \(User u, string[] args) {
     writeln "$(void*:that)";
@@ -252,7 +252,7 @@ void main(string[] args) {
   
   callbacks ~= ("shutdown",
     \(Server server,string channel,User user,string[] args) {
-      if !user.hasPrivilege PrivilegeLevel.Owner return "Not Admin.";
+      if !user.hasPrivilege PrivilegeLevel.Owner return "Not Owner.";
       if args.length < 1 return string:null;
       dumpUsers();
       for auto s <- servers
@@ -273,7 +273,7 @@ void main(string[] args) {
 
   tp = new ThreadPool 16;
   //newServer(args[0],args[1],args[2..$]);
-  string[] lines = string:readAll "autojoin.txt" #.split "\n";
+  string[] lines = string:readAll "autojoin.csv" #.split "\n";
   for auto l <- lines {
     auto a = l.split "," #.map &strip #.eval;
     writeln "$a";
@@ -282,7 +282,7 @@ void main(string[] args) {
     newServer(a[(2, 0, 1, 3, 4..$)]);
   }
   
-  lines = string:readAll "users.txt" #.split "\n";
+  lines = string:readAll "users.csv" #.split "\n";
   for auto l <- lines {
     auto a = l.split "," #.map &strip #.eval;
     User u;// = new User; // bad

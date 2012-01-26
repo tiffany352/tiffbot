@@ -1,3 +1,0 @@
-physibots.info, 6667, tiffbot, , #sting, #test, #physibots, #kawaisa-public, #kawaisa, #offroads
-irc.freenode.net, 6667, tiffbot, , ##codelab
-irc.esper.net, 6667, tiffbot, , #offroads, #codetalk

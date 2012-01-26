@@ -1,0 +1,20 @@
+#!/usr/bin/env lua
+
+-- nick user host permissions channel network 
+
+table.remove(arg,1);
+table.remove(arg,1);
+table.remove(arg,1);
+table.remove(arg,1);
+table.remove(arg,1);
+table.remove(arg,1);
+
+sum = 0;
+str = string.lower(table.concat(arg," "));
+for i=1,#str do
+  sum = sum + string.byte(string.sub(str,i,i))
+end
+n = sum % 6 + 1;
+r = {"Yes.", "No.", "Doubt it.", "All signs point to yes.", "Ask again later.", "It's likely."};
+print(r[n]);
+
