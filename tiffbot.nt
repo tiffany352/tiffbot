@@ -142,7 +142,8 @@ void newServer(string nick, string address, string port, string passwd, string[]
   });
   
   onCommand = new \(User u, Command command, string[] args) {
-    callHook(that, u, "$(int:command)", args);
+    auto res = callHook(that, u, "$(int:command)", args);
+    sendCommand res;
   };
   
   for auto c <- chans
