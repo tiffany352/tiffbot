@@ -1,0 +1,26 @@
+module main;
+
+import std.thread, std.time, std.file, std.string, std.fun, std.irc;
+import tiffbot, privilege, internal;
+
+void main() {
+  tp = new ThreadPool 16;
+  //newServer(args[0],args[1],args[2..$]);
+  string[] lines = string:readAll "autojoin.csv" #.split "\n";
+  for auto l <- lines {
+    auto a = l.split "," #.map &strip #.eval;
+    writeln "$a";
+    // func: nick, address, port, passwd, chans
+    // file: server, port, nick, passwd, chans
+    newServer(a[(2, 0, 1, 3, 4..$)]);
+  }
+
+  loadUsers;
+  
+  while true {
+    for auto s <- servers
+      s.sendCommand "PING :00000000";
+    sleep(16);
+  }
+}
+

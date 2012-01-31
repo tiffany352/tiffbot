@@ -1,0 +1,62 @@
+module privilege;
+
+import std.irc, std.string, std.file, std.fun;
+
+enum PrivilegeLevel {
+  Banned,
+  None,
+  Admin,
+  Owner
+}
+
+// name, privileges, array of server nickserv statuses
+shared (User,PrivilegeLevel,(string,int)[])[] users;
+
+PrivilegeLevel getPrivilege(User u) {
+  for auto r <- users {
+    if usersEqual(r[0],u)
+      return r[1];
+    auto rest = r[0].nick.startsWith "R:";
+    if rest == u.nick {
+      // not implemented
+    }
+  }
+  return PrivilegeLevel.None;
+}
+
+bool hasPrivilege(User u, PrivilegeLevel p) {
+  return u.getPrivilege() >= p;
+}
+
+void setPrivilege(User u, PrivilegeLevel p) {
+  for auto r <- users {
+    if usersEqual(r[0],u)
+      r[1] = p;
+    auto rest = r[0].nick.startsWith "R:";
+    if rest == u.nick
+      r[1] = p;
+  }
+  users ~= (u,p,(string,int)[]: null);
+  writeln "User $(u.nick)!$(u.user)@$(u.host) now has permission level $p.";
+}
+
+void loadUsers() {
+  auto lines = string:readAll "users.csv" #.split "\n";
+  for auto l <- lines {
+    auto a = l.split "," #.map &strip #.eval;
+    User u;
+    u.nick = a[0];
+    u.user = a[1];
+    u.host = a[2];
+    u.setPrivilege PrivilegeLevel:atoi a[3];
+  }
+}
+
+void dumpUsers() {
+  char[auto~] userfile;
+  for auto u <- users {
+    userfile ~= "$(u[0].nick), $(u[0].user), $(u[0].host), $(u[1])\n";
+  }
+  "users.csv".writeAll byte[]:userfile[];
+}
+

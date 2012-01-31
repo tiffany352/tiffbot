@@ -1,0 +1,135 @@
+module internal;
+
+import std.irc, std.string;
+import tiffbot, privilege;
+
+extern(C) void exit(int);
+
+void init()::
+
+////////////////////////////////////////////////////////////////////////////////
+// privilege commands
+
+callbacks ~= ("ban",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+    if args.length < 1 return string:null;
+    User victim;
+    if args[0].find "R:" {
+      victim.nick = args[0];
+      victim.user = "*";
+      victim.host = "*";
+    }
+    if args[0].find "!" {
+      (victim.nick, string rest) = args[0].slice "!";
+      (victim.user, victim.host) = rest.slice "@";
+    }
+    victim.setPrivilege PrivilegeLevel.Banned;
+    return "$(args[0]) now has privilege level Banned.";
+  }
+);
+
+callbacks ~= ("user",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+    if args.length < 1 return string:null;
+    User victim;
+    if args[0].find "R:" {
+      victim.nick = args[0];
+      victim.user = "*";
+      victim.host = "*";
+    }
+    if args[0].find "!" {
+      (victim.nick, string rest) = args[0].slice "!";
+      (victim.user, victim.host) = rest.slice "@";
+    }
+    victim.setPrivilege PrivilegeLevel.None;
+    return "$(args[0]) now has privilege level None.";
+  }
+);
+
+callbacks ~= ("admin",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Owner return "Not Owner.";
+    if args.length < 1 return string:null;
+    User victim;
+    if args[0].find "R:" {
+      victim.nick = args[0];
+      victim.user = "*";
+      victim.host = "*";
+    }
+    if args[0].find "!" {
+      (victim.nick, string rest) = args[0].slice "!";
+      (victim.user, victim.host) = rest.slice "@";
+    }
+    victim.setPrivilege PrivilegeLevel.Admin;
+    return "$(args[0]) now has privilege level Admin.";
+  }
+);
+
+callbacks ~= ("owner",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Owner return "Not Owner.";
+    if args.length < 1 return string:null;
+    User victim;
+    if args[0].find "R:" {
+      victim.nick = args[0];
+      victim.user = "*";
+      victim.host = "*";
+    }
+    if args[0].find "!" {
+      (victim.nick, string rest) = args[0].slice "!";
+      (victim.user, victim.host) = rest.slice "@";
+    }
+    victim.setPrivilege PrivilegeLevel.Owner;
+    return "$(args[0]) now has privilege level Owner.";
+  }
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// operator commands
+
+callbacks ~= ("join",
+  \(Server server,string channel,User user,string[] args) {
+    //writeln "$(void*:server)";
+    if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+    if args.length < 1 return string:null;
+    if !server raise new Error "wth server is null";
+    for auto c <- args {
+      server.join c;
+      writeln "Joining $c";
+    }
+    return string:null;
+  }
+);
+
+callbacks ~= ("connect",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+    if args.length < 1 return string:null;
+    newServer(server.me.nick, args[0], "6667", string:null, string[]:null);
+    return string:null;
+  }
+);
+
+callbacks ~= ("shutdown",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Owner return "Not Owner.";
+    if args.length < 1 return string:null;
+    dumpUsers();
+    for auto s <- servers
+      s.quit "tiffbot";
+    exit(0);
+    return string:null;
+  }
+);
+
+callbacks ~= ("nick",
+  \(Server server,string channel,User user,string[] args) {
+    if !user.hasPrivilege PrivilegeLevel.Admin return "Not Admin.";
+    if args.length < 1 return string:null;
+    server.nick args[0];
+    return string:null;
+  }
+);
+
