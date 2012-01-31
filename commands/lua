@@ -1,16 +1,36 @@
 #!/usr/bin/env lua
 
+require "sandbox"
+
 do
   local nick, user, host, permissions, channel, network = unpack(arg);
   for i=1,6 do
     table.remove (arg, 1);
   end
-  if tonumber(permissions) < 2 then
+  --print(permissions)
+  --[[if tonumber(permissions) < 2 then
     print "Admin or higher required.";
     os.exit(1);
-  end
+  end]]
   script = table.concat(arg," ");
-  
-  loadstring(script)();
+  if tonumber(permissions) < 2 then
+    local tab = callSandbox(script)
+    local str = tab[1] or ""
+    for i=2,#tab do
+      str = str .. ", " .. tab[i]
+    end
+    print(str.sub(1,386) .. (#str > 386 and ("... [" .. #str .. " bytes cut]") or ""))
+  else
+    local chunk, err = loadstring(script);
+    if err then
+      print(err);
+    end
+    if chunk then
+      local ret = chunk();
+      if ret then
+        print(ret);
+      end
+    end
+  end
 end
 

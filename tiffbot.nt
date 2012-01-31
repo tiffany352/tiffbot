@@ -52,7 +52,25 @@ void dumpUsers() {
   "users.csv".writeAll byte[]:userfile[];
 }
 
-(string,string[]) parseInput(string i) {
+(string,string[]) parseInput(Server serv, string chan, User user, string i) {
+  bool inctcp = false;
+  int start;
+  
+  for (int j=0;j<i.length;j++) {
+    alias c = i[j];
+    if c == 1 {
+      if inctcp {
+        auto res = handleCTCP(serv, chan, user, i[start+1 .. j]);
+        if res
+          serv.msg(user.nick,"\x01$res\x01");
+      } else {
+        start = j;
+      }
+      
+      inctcp = !inctcp;
+    }
+  }
+  
   i = i.strip();
   string command;
   string[] args;
@@ -105,8 +123,40 @@ string handleInput (Server server, string channel, User user, string command, st
   return null;
 }
 
-string handleCTCP(Server server, string channel, User user, string command, string[] args) {
+string callHook (Server server, User user, string name, string[] args) {
+  if exists "hooks/$name" {
+    string[auto~] a;
+    a ~= user.nick;
+    a ~= user.user;
+    a ~= user.host;
+    a ~= "$(getPrivilege user)";
+    a ~= server.name;
+    a ~= args;
+    return std.string.join readback("hooks/$name",a[]);
+  }
+  return null;
+}
 
+string handleCTCP(Server server, string channel, User user, string command) {
+  (command,string[] args) = command.split " " #.(that[0], that[1 .. $]);
+  writeln "CTCP $command: $args";
+  
+  if command.find ".."
+    return ":D nice try";
+  if command.startsWith "/"
+    return "hehe you so silly :3";
+  if exists "hooks/ctcp/$command" {
+    string[auto~] a;
+    a ~= user.nick;
+    a ~= user.user;
+    a ~= user.host;
+    a ~= "$(getPrivilege user)";
+    a ~= server.name;
+    a ~= command;
+    a ~= args;
+    return std.string.join readback("hooks/ctcp/$command",a[]);
+  }
+  return null;
 }
 
 shared Server[] servers;
@@ -119,7 +169,7 @@ void newServer(string nick, string address, string port, string passwd, string[]
     string message = args[1];
     string target = args[0];
     writeln "$target: <$(u.nick)> $message";
-    auto t = parseInput message;
+    auto t = parseInput(that,target,u,message);
     //if !t return;
     if !t[0] return;
     string r = handleInput(that,target,u,t[0],t[1]);
@@ -133,10 +183,13 @@ void newServer(string nick, string address, string port, string passwd, string[]
       }
     }
   });
-  setCallback(Reply.RPL_WELCOME, new \(User u, string[] args) {
-    for auto c <- chans
-      c.join;
-  });
+  
+  onCommand = new \(User u, Command command, string[] args) {
+    callHook(that, u, "$(int:command)", args);
+  };
+  
+  for auto c <- chans
+    c.join;
   
   tp.addTask &that.listen;
   servers ~= that;
